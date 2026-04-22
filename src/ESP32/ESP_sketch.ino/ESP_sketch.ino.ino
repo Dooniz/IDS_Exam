@@ -20,10 +20,26 @@ const char* mqttTopic = "esp32IDS/vandkvalitet";
 
 // NeoPixel
 #define LED_PIN 17
-#define NUM_LEDS 40
+#define NUM_LEDS 21
 
 CRGB leds[NUM_LEDS];
 
+
+
+// parse MQTT message to extract windspeed
+//assuming the format is "Wind Speed: XX.XX m/s"
+float parseWindSpeed(String msg) {
+  int index = msg.indexOf("Wind Speed: ");
+  if (index != -1) {
+    int start = index + String("Wind Speed: ").length();
+    int end = msg.indexOf(" m/s", start);
+    if (end != -1) {
+      String speedStr = msg.substring(start, end);
+      return speedStr.toFloat();
+    }
+  }
+  return -1.0; // Return -1 if parsing fails
+}
 
 //Setup wifi function
 void setup_wifi() {
@@ -70,6 +86,9 @@ void callback(char* topic, byte* payload, unsigned int length) {
   for (int i = 0; i < length; i++) {
     msg += (char)payload[i];
   }
+  //parse windspeed to float
+  float windSpeed = parseWindSpeed(msg);
+
   Serial.print("Message arrived [");
   Serial.print(topic);
   Serial.print("] ");
@@ -93,6 +112,32 @@ void callback(char* topic, byte* payload, unsigned int length) {
       leds[i] = CHSV(random(0, 255), 255, 255);
     }
     FastLED.show();
+  } 
+  //error handling for parsing wind speed
+  else if (windSpeed == -1.0) {
+    Serial.println("Failed to parse wind speed");
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Red;
+    }
+    FastLED.show();
+    return;
+  } 
+  //show wind speed by moving a white light across the strip with delay based on the speed
+  //i want it to continue looping until a new message is received, so it should be non-blocking
+  else {
+    while(client.connected()) {
+       client.loop(); // Keep MQTT connection alive
+       // If a new message is received, break the loop to handle it
+       if (client.state() != MQTT_CONNECTED) {
+         break;
+       }
+    int delayTime = map(windSpeed, 0, 30, 1400, 300); // Map wind speed to delay time (0-20 m/s to 1000-100 ms)
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::White;
+      FastLED.show();
+      delay(delayTime);
+      leds[i] = CRGB::Black;
+    }
   }
 }
 
