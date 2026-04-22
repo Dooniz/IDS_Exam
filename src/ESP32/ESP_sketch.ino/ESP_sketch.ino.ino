@@ -29,11 +29,6 @@ CRGB leds[NUM_LEDS];
 void setup_wifi() {
   if (WiFi.status() == WL_CONNECTED) return; // Already connected
 
-  lcd.clear();
-  lcd.setCursor(0, 0);
-  lcd.print("Connecting to");
-  lcd.setCursor(0, 1);
-  lcd.print("WiFi...");
 
   Serial.print("Connecting to WiFi...");
   WiFi.disconnect();
@@ -47,16 +42,8 @@ void setup_wifi() {
 
   if (WiFi.status() == WL_CONNECTED) {
     Serial.println("\nWiFi reconnected!");
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Connected to");
-    lcd.setCursor(0, 1);
-    lcd.print("Internet");
   } else {
     Serial.println("\nWiFi reconnect failed!");
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("WiFi failed");
   }
 }
 
@@ -95,6 +82,17 @@ void callback(char* topic, byte* payload, unsigned int length) {
     leds[i] = CRGB::Green;
     }
     FastLED.show();
+  } else if (msg == "LED_OFF") {
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB::Black;
+    }
+    FastLED.show();
+  }
+  else if (msg == "party") {
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CHSV(random(0, 255), 255, 255);
+    }
+    FastLED.show();
   }
 }
 
@@ -102,7 +100,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
-  pinMode(buttonPin, INPUT_PULLUP);
 
   // Initialize NeoPixel
   FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
