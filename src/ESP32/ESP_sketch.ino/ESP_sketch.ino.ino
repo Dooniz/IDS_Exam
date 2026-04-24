@@ -5,8 +5,8 @@
 
 
 // WiFi
-const char* ssid = "RUC-IOT";
-const char* password = "GiHa5934La";
+const char* ssid = "RUC-IOT"; //replace with your WiFi SSID
+const char* password = "GiHa5934La"; //replace with your WiFi password
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -16,7 +16,7 @@ const char* mqttServer = "public.cloud.shiftr.io";
 const int mqttPort = 1883;
 const char* mqttUser = "public";
 const char* mqttPassword = "public";
-const char* mqttTopic = "esp32IDS/vandkvalitet";
+const char* mqttTopic = "esp32/Wind_Speed";
 
 // NeoPixel
 #define LED_PIN 17
@@ -25,20 +25,33 @@ const char* mqttTopic = "esp32IDS/vandkvalitet";
 CRGB leds[NUM_LEDS];
 
 
-
-// parse MQTT message to extract windspeed
-//assuming the format is "Wind Speed: XX.XX m/s"
+// Function to parse wind speed from MQTT message
+//allow non decimal numbers as well, but return -1 if the format is invalid
 float parseWindSpeed(String msg) {
-  int index = msg.indexOf("Wind Speed: ");
-  if (index != -1) {
-    int start = index + String("Wind Speed: ").length();
-    int end = msg.indexOf(" m/s", start);
-    if (end != -1) {
-      String speedStr = msg.substring(start, end);
-      return speedStr.toFloat();
+  msg.trim(); // Remove any leading/trailing whitespace
+  if (msg.length() == 0) return -1.0; // Empty message
+
+  // Check if the message is a valid number (integer or float)
+  bool isValid = true;
+  bool hasDecimal = false;
+  for (size_t i = 0; i < msg.length(); i++) {
+    char c = msg.charAt(i);
+    if (c == '.') {
+      if (hasDecimal) {
+        isValid = false; // More than one decimal point
+        break;
+      }
+      hasDecimal = true;
+    } else if (!isDigit(c)) {
+      isValid = false; // Non-digit character
+      break;
     }
   }
-  return -1.0; // Return -1 if parsing fails
+
+  if (!isValid) {
+    return -1.0;
+  }
+  return msg.toFloat();
 }
 
 //Setup wifi function
@@ -95,26 +108,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.println(msg);
 
 
-  // Control NeoPixel
-  if (msg == "LED_ON") {
-    for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CRGB::Green;
-    }
-    FastLED.show();
-  } else if (msg == "LED_OFF") {
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CRGB::Black;
-    }
-    FastLED.show();
-  }
-  else if (msg == "party") {
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CHSV(random(0, 255), 255, 255);
-    }
-    FastLED.show();
-  } 
-  //error handling for parsing wind speed
-  else if (windSpeed == -1.0) {
+  if (windSpeed == -1.0) {
     Serial.println("Failed to parse wind speed");
     for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CRGB::Red;
@@ -123,21 +117,16 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   } 
   //show wind speed by moving a white light across the strip with delay based on the speed
-  //i want it to continue looping until a new message is received, so it should be non-blocking
   else {
-    while(client.connected()) {
-       client.loop(); // Keep MQTT connection alive
-       // If a new message is received, break the loop to handle it
-       if (client.state() != MQTT_CONNECTED) {
-         break;
-       }
-    int delayTime = map(windSpeed, 0, 30, 1400, 300); // Map wind speed to delay time (0-20 m/s to 1000-100 ms)
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CRGB::White;
-      FastLED.show();
-      delay(delayTime);
-      leds[i] = CRGB::Black;
+    int delayTime = map(windSpeed, 0, 20, 100, 10); // Map wind speed to delay time (0-20 m/s to 100-10 ms)
+    for (int i = 0; i < 4; i++) {
+      for (int i = 0; i < NUM_LEDS; i++) {
+        leds[i] = CRGB::White;
+        FastLED.show();
+        delay(delayTime);
+        leds[i] = CRGB::Black;
     }
+  }
   }
 }
 
@@ -158,15 +147,13 @@ void setup() {
 
 void loop() {
 
-client.setCallback(callback);
-
-if (WiFi.status() != WL_CONNECTED) {
+  if (WiFi.status() != WL_CONNECTED) {
     setup_wifi();
   }
 
-if (!client.connected()) {
+  if (!client.connected()) {
     reconnect();
-}
+  }
 
 client.loop();
 
