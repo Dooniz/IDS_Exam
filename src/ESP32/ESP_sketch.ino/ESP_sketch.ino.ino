@@ -5,8 +5,8 @@
 
 
 // WiFi
-const char* ssid = "RUC-IOT"; //replace with your WiFi SSID
-const char* password = "GiHa5934La"; //replace with your WiFi password
+const char* ssid = "FTTH_GX3486"; //replace with your wifi id
+const char* password = "ujkakcarjAs3"; //replace with your wifi password
 
 WiFiClient espClient;
 PubSubClient client(espClient);
@@ -20,13 +20,12 @@ const char* mqttTopic = "esp32/Wind_Speed";
 
 // NeoPixel
 #define LED_PIN 17
-#define NUM_LEDS 21
+#define NUM_LEDS 10
 
 CRGB leds[NUM_LEDS];
 
 
 // Function to parse wind speed from MQTT message
-//allow non decimal numbers as well, but return -1 if the format is invalid
 float parseWindSpeed(String msg) {
   msg.trim(); // Remove any leading/trailing whitespace
   if (msg.length() == 0) return -1.0; // Empty message
@@ -116,15 +115,15 @@ void callback(char* topic, byte* payload, unsigned int length) {
     FastLED.show();
     return;
   } 
-  //show wind speed by moving a white light across the strip with delay based on the speed
+  //shows wind speed by moving a white light across the strip with delay based on the speed
   else {
-    int delayTime = map(windSpeed, 0, 20, 100, 10); // Map wind speed to delay time (0-20 m/s to 100-10 ms)
+    int delayTime = map(windSpeed, 0, 30, 100, 10); // Map wind speed to delay time (0-30 m/s to 100-10 ms)
     for (int i = 0; i < 4; i++) {
-      for (int i = 0; i < NUM_LEDS; i++) {
-        leds[i] = CRGB::White;
+      for (int j = NUM_LEDS; j > -1; j--) {
+        leds[j] = CRGB::White;
         FastLED.show();
         delay(delayTime);
-        leds[i] = CRGB::Black;
+        leds[j] = CRGB::Black;
     }
   }
   }
